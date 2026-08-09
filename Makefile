@@ -26,8 +26,9 @@ NewTerm_INSTALL_PATH = $(INSTALL_PREFIX)/Applications
 
 include $(THEOS_MAKE_PATH)/xcodeproj.mk
 
-# before-package::
-# 	perl -i -pe s/iphoneos-arm/$(DEB_ARCH)/ $(THEOS_STAGING_DIR)/DEBIAN/control
+before-package::
+	@perl -i -pe 's/^Architecture: iphoneos-arm$$/Architecture: $(DEB_ARCH)/' $(THEOS_STAGING_DIR)/DEBIAN/control
+
 
 after-stage::
 	@$(TARGET_CODESIGN) $(NewTerm_CODESIGN_FLAGS) $(THEOS_STAGING_DIR)$(INSTALL_PREFIX)/Applications/NewTerm.app/NewTermLoginHelper

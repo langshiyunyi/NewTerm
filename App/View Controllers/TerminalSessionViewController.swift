@@ -35,6 +35,8 @@ class TerminalSessionViewController: BaseTerminalSplitViewControllerChild {
     private var textView: UIView!
     private var tableView: UITableView!
 	private var textViewTapGestureRecognizer: UITapGestureRecognizer!
+	private var fontPinchGestureRecognizer: UIPinchGestureRecognizer!
+	private var pinchStartFontSize: Double?
     
 	private var state = TerminalState()
     private var lines = [BufferLine]()
@@ -89,6 +91,10 @@ class TerminalSessionViewController: BaseTerminalSplitViewControllerChild {
 		textViewTapGestureRecognizer = UITapGestureRecognizer(target: self, action: #selector(self.handleTextViewTap(_:)))
 		textViewTapGestureRecognizer.delegate = self
 		textView.addGestureRecognizer(textViewTapGestureRecognizer)
+		fontPinchGestureRecognizer = UIPinchGestureRecognizer(target: self, action: #selector(self.handleFontPinch(_:)))
+		fontPinchGestureRecognizer.delegate = self
+		fontPinchGestureRecognizer.cancelsTouchesInView = false
+		textView.addGestureRecognizer(fontPinchGestureRecognizer)
 
 		keyInput.frame = view.bounds
 		keyInput.autoresizingMask = [.flexibleWidth, .flexibleHeight]
@@ -298,6 +304,28 @@ class TerminalSessionViewController: BaseTerminalSplitViewControllerChild {
 		}
 	}
 
+	@objc private func handleFontPinch(_ gestureRecognizer: UIPinchGestureRecognizer) {
+		switch gestureRecognizer.state {
+		case .began:
+			pinchStartFontSize = Preferences.shared.fontSize
+		case .changed, .ended:
+			guard let pinchStartFontSize = pinchStartFontSize else { return }
+
+			let fontSize = min(max((pinchStartFontSize * gestureRecognizer.scale).rounded(), 1), 20)
+			if Preferences.shared.fontSize != fontSize {
+				Preferences.shared.fontSize = fontSize
+			}
+
+			if gestureRecognizer.state == .ended {
+				self.pinchStartFontSize = nil
+			}
+		case .cancelled, .failed:
+			pinchStartFontSize = nil
+		default:
+			break
+		}
+	}
+
 	// MARK: - Lifecycle
 
 	@objc private func sceneDidEnterBackground(_ notification: Notification) {
@@ -315,6 +343,9 @@ class TerminalSessionViewController: BaseTerminalSplitViewControllerChild {
 	@objc private func preferencesUpdated() {
 		state.fontMetrics = terminalController.fontMetrics
 		state.colorMap = terminalController.colorMap
+		if textView != nil {
+			updateScreenSize()
+		}
 	}
 }
 
@@ -415,6 +446,11 @@ extension TerminalSessionViewController: UIGestureRecognizerDelegate {
 		// internal text view/scroll view gestures… as much as we can avoid conflicting, at least.
 		return gestureRecognizer == textViewTapGestureRecognizer
 			&& (!(otherGestureRecognizer is UITapGestureRecognizer) || keyInput.isFirstResponder)
+	}
+
+	func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+		return gestureRecognizer == fontPinchGestureRecognizer
+			|| otherGestureRecognizer == fontPinchGestureRecognizer
 	}
 }
 

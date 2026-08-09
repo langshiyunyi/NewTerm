@@ -28,37 +28,50 @@ open class StringSupplier {
         guard let terminal = terminal else {
             fatalError()
         }
-        
+
         //		guard let line = terminal.getScrollInvariantLine(row: row) else {
         //			return AnyView(EmptyView())
         //		}
         let line = terminal.buffer.lines[row]
         //        NSLog("NewTermLog: line[\(row)]=\(line)")
-        
+
         let cursorPosition = terminal.getCursorLocation()
         let scrollbackRows = terminal.getTopVisibleRow()
 
         return attributedString(line: line, cursorX: row - scrollbackRows == cursorPosition.y ? cursorPosition.x : -1)
     }
-    
+
     public func attributedString(line: BufferLine, cursorX: Int) -> AnyView {
 		var lastAttribute = Attribute.empty
 		var views = [AnyView]()
 		var buffer = ""
+		var bufferWidth = 0
+		var skipContinuationCell = false
+
         for j in 0..<line.count {
+			if skipContinuationCell {
+				skipContinuationCell = false
+				continue
+			}
+
 			let data = line[j]
 			let isCursor = cursorVisible && j == cursorX
 
 			if isCursor || lastAttribute != data.attribute {
-				// Finish up the last run by appending it to the attributed string, then reset for the
-				// next run.
-				views.append(text(buffer, attribute: lastAttribute))
+				if !buffer.isEmpty || bufferWidth > 0 {
+					views.append(text(buffer, width: bufferWidth, attribute: lastAttribute))
+				}
 				lastAttribute = data.attribute
 				buffer.removeAll()
+				bufferWidth = 0
 			}
 
 			let character = data.getCharacter()
 			buffer.append(character == "\0" ? " " : character)
+			bufferWidth += max(Int(data.width), 1)
+			if data.width > 1 {
+				skipContinuationCell = true
+			}
 
 			if isCursor {
 				// We may need to insert a space for the cursor to show up.
@@ -66,13 +79,16 @@ open class StringSupplier {
 					buffer.append(" ")
 				}
 
-				views.append(text(buffer, attribute: lastAttribute, isCursor: true))
+				views.append(text(buffer, width: bufferWidth, attribute: lastAttribute, isCursor: true))
 				buffer.removeAll()
+				bufferWidth = 0
 			}
 		}
 
 		// Append the final run
-		views.append(text(buffer, attribute: lastAttribute))
+		if !buffer.isEmpty || bufferWidth > 0 {
+			views.append(text(buffer, width: bufferWidth, attribute: lastAttribute))
+		}
 
 		return AnyView(HStack(alignment: .firstTextBaseline, spacing: 0) {
 			views.reduce(AnyView(EmptyView()), { $0 + $1 })
@@ -81,7 +97,7 @@ open class StringSupplier {
         )
 	}
 
-	private func text(_ run: String, attribute: Attribute, isCursor: Bool = false) -> AnyView {
+	private func text(_ run: String, width: Int, attribute: Attribute, isCursor: Bool = false) -> AnyView {
 		var fgColor = attribute.fg
 		var bgColor = attribute.bg
 
@@ -96,12 +112,12 @@ open class StringSupplier {
 		}
 
 		let foreground = colorMap?.color(for: fgColor,
-																		 isForeground: true,
-																		 isBold: attribute.style.contains(.bold),
-																		 isCursor: isCursor)
+																 isForeground: true,
+																 isBold: attribute.style.contains(.bold),
+																 isCursor: isCursor)
 		let background = colorMap?.color(for: bgColor,
-																		 isForeground: false,
-																		 isCursor: isCursor)
+																 isForeground: false,
+																 isCursor: isCursor)
 
 		let font: UIFont?
 		if attribute.style.contains(.bold) || attribute.style.contains(.blink) {
@@ -112,7 +128,7 @@ open class StringSupplier {
 			font = attribute.style.contains(.italic) ? fontMetrics?.italicFont : fontMetrics?.regularFont
 		}
 
-		let width = CGFloat(run.unicodeScalars.reduce(0, { $0 + UnicodeUtil.columnWidth(rune: $1) })) * (fontMetrics?.width ?? 0)
+		let width = CGFloat(width) * (fontMetrics?.width ?? 0)
 
 		return AnyView(
 			Text(run)
