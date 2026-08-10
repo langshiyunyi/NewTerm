@@ -15,6 +15,7 @@ public protocol ActionLabelView: View {
 // MARK: - Implementation --
 
 extension ActionLabelView {
+    @_disfavoredOverload
     public init(action: @escaping () -> Void, @ViewBuilder label: () -> Label) {
         self.init(action: .init(action), label: label)
     }
@@ -123,7 +124,8 @@ extension Button where Label == SwiftUI.Label<Text, Image> {
 // MARK: - Conformances -
 
 extension Button: ActionLabelView {
+    @_disfavoredOverload
     public init(action: Action, @ViewBuilder label: () -> Label) {
-        self.init(action: action.perform, label: label)
+        self.init(action: { action.perform() }, label: label)
     }
 }
