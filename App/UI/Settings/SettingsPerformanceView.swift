@@ -68,9 +68,9 @@ struct SettingsPerformanceView: View {
 
 			if UIDevice.current.isPortable {
 				PreferencesGroup(header: Label(title: { Text("On Battery") },
-																			 icon: { Image(systemName: batteryImageName).imageScale(.medium) }),
-												 footer: Text("A lower refresh rate improves \(UIDevice.current.deviceModel) battery life, but may cause the terminal display to feel sluggish.\nThe Performance setting is recommended.")
-													.fixedSize(horizontal: false, vertical: true)) {
+															 icon: { Image(systemName: batteryImageName).imageScale(.medium) }),
+										 footer: Text(String(format: .localize("BATTERY_REFRESH_RATE_FOOTER"), UIDevice.current.deviceModel))
+											.fixedSize(horizontal: false, vertical: true)) {
 						PreferencesPicker(selection: $preferences.refreshRateOnBattery,
 															label: EmptyView()) {
 							list
@@ -105,4 +105,3 @@ struct SettingsPerformanceView_Previews: PreviewProvider {
 		.previewDisplayName("120 Hz device")
 	}
 }
-

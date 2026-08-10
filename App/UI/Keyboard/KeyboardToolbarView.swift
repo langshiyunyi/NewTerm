@@ -29,11 +29,7 @@ enum Toolbar: CaseIterable {
 	var keys: [ToolbarKey] {
 		switch self {
 		case .primary:
-			return [
-                .control, .escape, .tab, .Delete, //.more,
-				.variableSpace(id: 0),
-				.arrows
-			]
+			return []
 
 		case .padPrimaryLeading:
 			return [.control, .escape, .tab, .more]
@@ -64,7 +60,7 @@ enum ToolbarKey: Hashable {
 	case variableSpace(id: Int)
 	case arrows
 	// Primary - leading
-	case control, escape, tab, more, Delete
+	case control, shift, escape, tab, more, Delete
 	// Primary - trailing
 	case up, down, left, right
 	// Secondary - navigation
@@ -81,61 +77,64 @@ enum ToolbarKey: Hashable {
 			return Key(label: "")
 
 		// Primary - leading
-		case .control:  return Key(label: .localize("Control"),
-															 glyph: .localize("Ctrl"),
-															 imageName: .control,
-															 isToggle: true)
-		case .escape:   return Key(label: .localize("Escape"),
-															 glyph: .localize("Esc"),
-															 imageName: .escape)
-		case .tab:      return Key(label: .localize("Tab"),
-															 imageName: .arrowRightToLine)
-		case .more:     return Key(label: .localize("More"),
-															 imageName: .ellipsis,
+			case .control:  return Key(label: "Control",
+												 glyph: "Ctrl",
+												 imageName: .control,
+												 isToggle: true)
+				case .shift:    return Key(label: "Shift",
+												 imageName: .shift,
+												 isToggle: true)
+		case .escape:   return Key(label: "Escape",
+												 glyph: "Esc",
+												 imageName: .escape)
+		case .tab:      return Key(label: "Tab",
+												 imageName: .arrowRightToLine)
+		case .more:     return Key(label: "More",
+												 imageName: .ellipsis,
 															 preferredStyle: .icons,
 															 isToggle: true)
             
-        case .Delete:   return Key(label: .localize("Delete Forward"),
-                                                                 glyph: .localize("Del"),
+        case .Delete:   return Key(label: "Delete Forward",
+                                                                 glyph: "Del",
                                                                  imageName: .deleteRight,
                                                                  preferredStyle: .icons)
 		// Primary - trailing
-		case .up:       return Key(label: .localize("Up"),
+		case .up:       return Key(label: "Up",
 															 imageName: .arrowUp,
 															 preferredStyle: .icons,
 															 widthRatio: 1, minWidth: 25)
-		case .down:     return Key(label: .localize("Down"),
+		case .down:     return Key(label: "Down",
 															 imageName: .arrowDown,
 															 preferredStyle: .icons,
 															 widthRatio: 1, minWidth: 25)
-		case .left:     return Key(label: .localize("Left"),
+		case .left:     return Key(label: "Left",
 															 imageName: .arrowLeft,
 															 preferredStyle: .icons,
 															 widthRatio: 1, minWidth: 25)
-		case .right:    return Key(label: .localize("Right"),
+		case .right:    return Key(label: "Right",
 															 imageName: .arrowRight,
 															 preferredStyle: .icons,
 															 widthRatio: 1, minWidth: 25)
 		// Secondary - navigation
-        case .home:     return Key(label: .localize("Home"),
+        case .home:     return Key(label: "Home",
                                    widthRatio: 1.25, heightRatio: isSmallDevice ? 0.8 : 1)
-		case .end:      return Key(label: .localize("End"),
+		case .end:      return Key(label: "End",
                                    widthRatio: 1.25, heightRatio: isSmallDevice ? 0.8 : 1)
-		case .pageUp:   return Key(label: .localize("Page Up"),
-															 glyph: .localize("PgUp"),
+		case .pageUp:   return Key(label: "Page Up",
+												 glyph: "PgUp",
                                    widthRatio: 1.25, heightRatio: isSmallDevice ? 0.8 : 1)
-		case .pageDown: return Key(label: .localize("Page Down"),
-															 glyph: .localize("PgDn"),
+		case .pageDown: return Key(label: "Page Down",
+												 glyph: "PgDn",
                                    widthRatio: 1.25, heightRatio: isSmallDevice ? 0.8 : 1)
 
 		// Secondary - extras
-		case .delete:   return Key(label: .localize("Delete Forward"),
-															 glyph: .localize("Del"),
+		case .delete:   return Key(label: "Delete Forward",
+												 glyph: "Del",
 //															 imageName: .deleteRight,
 															 preferredStyle: .icons,
                                     widthRatio: 1, heightRatio: isSmallDevice ? 0.8 : 1)
-		case .fnKeys:   return Key(label: .localize("Function Keys"),
-															 glyph: .localize("Fn"),
+		case .fnKeys:   return Key(label: "Function Keys",
+												 glyph: "Fn",
 															 isToggle: true,
                                    widthRatio: 1, heightRatio: isSmallDevice ? 0.8 : 1)
 
@@ -168,10 +167,25 @@ struct KeyboardToolbarKeyStack: View {
 	@EnvironmentObject var state: KeyboardToolbarViewState
 
 	@ObservedObject private var preferences = Preferences.shared
+	@ObservedObject private var shortcutPreferences = KeyboardShortcutPreferences.shared
 
+	@ViewBuilder
 	var body: some View {
+		if toolbar == .primary {
+			HStack(alignment: .center, spacing: 5) {
+				ScrollView(.horizontal, showsIndicators: false) {
+					keyRow(shortcutPreferences.keys.map(\.toolbarKey))
+				}
+				arrowsView
+					.fixedSize(horizontal: true, vertical: false)
+			}
+		} else {
+			keyRow(toolbar.keys)
+		}
+	}
+
+	private func keyRow(_ keys: [ToolbarKey]) -> some View {
 		HStack(alignment: .center, spacing: 5) {
-            let keys = toolbar.keys
 			ForEach(keys, id: \.self) { key in
 				switch key {
 				case .fixedSpace:    EmptyView()

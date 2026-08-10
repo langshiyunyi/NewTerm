@@ -27,7 +27,7 @@ extension ToolbarKey {
         case .Delete:   return EscapeSequences.Delete
 		case .fnKey(let index): return EscapeSequences.fn[index - 1]
 		case .fixedSpace, .variableSpace, .arrows,
-				 .control, .more, .fnKeys:
+				 .control, .shift, .more, .fnKeys:
 			return []
 		}
 	}
@@ -42,8 +42,75 @@ extension ToolbarKey {
 		}
 	}
 
-	func keySequence(applicationCursor: Bool = false) -> [UTF8Char] {
-		(applicationCursor ? appKeySequence : nil) ?? keySequence
+	func keySequence(applicationCursor: Bool = false, shift: Bool = false, control: Bool = false) -> [UTF8Char] {
+		if shift || control {
+			let modifier = 1 + (shift ? 1 : 0) + (control ? 4 : 0)
+			switch self {
+			case .tab where shift:
+				return "\u{1b}[Z".utf8Array
+			case .up:
+				return "\u{1b}[1;\(modifier)A".utf8Array
+			case .down:
+				return "\u{1b}[1;\(modifier)B".utf8Array
+			case .right:
+				return "\u{1b}[1;\(modifier)C".utf8Array
+			case .left:
+				return "\u{1b}[1;\(modifier)D".utf8Array
+			case .home:
+				return "\u{1b}[1;\(modifier)H".utf8Array
+			case .end:
+				return "\u{1b}[1;\(modifier)F".utf8Array
+			case .pageUp:
+				return "\u{1b}[5;\(modifier)~".utf8Array
+			case .pageDown:
+				return "\u{1b}[6;\(modifier)~".utf8Array
+			case .delete, .Delete:
+				return "\u{1b}[3;\(modifier)~".utf8Array
+			case .fnKey(let index) where index >= 1 && index <= 4:
+				let final = ["P", "Q", "R", "S"][index - 1]
+				return "\u{1b}[1;\(modifier)\(final)".utf8Array
+			case .fnKey(let index) where index >= 5 && index <= 12:
+				let code = [15, 17, 18, 19, 20, 21, 23, 24][index - 5]
+				return "\u{1b}[\(code);\(modifier)~".utf8Array
+			default:
+				break
+			}
+		}
+
+		return (applicationCursor ? appKeySequence : nil) ?? keySequence
+	}
+}
+
+private extension UTF8Char {
+	var shiftedCharacter: UTF8Char {
+		if self >= 0x61 && self <= 0x7A {
+			return self - 0x20
+		}
+
+		switch self {
+		case 0x31: return 0x21
+		case 0x32: return 0x40
+		case 0x33: return 0x23
+		case 0x34: return 0x24
+		case 0x35: return 0x25
+		case 0x36: return 0x5E
+		case 0x37: return 0x26
+		case 0x38: return 0x2A
+		case 0x39: return 0x28
+		case 0x30: return 0x29
+		case 0x60: return 0x7E
+		case 0x2D: return 0x5F
+		case 0x3D: return 0x2B
+		case 0x5B: return 0x7B
+		case 0x5D: return 0x7D
+		case 0x5C: return 0x7C
+		case 0x3B: return 0x3A
+		case 0x27: return 0x22
+		case 0x2C: return 0x3C
+		case 0x2E: return 0x3E
+		case 0x2F: return 0x3F
+		default:   return self
+		}
 	}
 }
 
@@ -144,7 +211,9 @@ class TerminalKeyInput: TextInputBase {
 	override func insertText(_ text: String) {
 		// Used by the software keyboard only. See pressesBegan(_:with:) below for hardware keyboard.
 		let isCtrlDown = state.toggledKeys.contains(.control)
+		let isShiftDown = state.toggledKeys.contains(.shift)
 		let data = text.utf8.map { character -> UTF8Char in
+			let character = isShiftDown ? character.shiftedCharacter : character
 			// Convert newline to carriage return
 			if character == 0x0A {
 				return EscapeSequences.return.first!
@@ -157,9 +226,8 @@ class TerminalKeyInput: TextInputBase {
 
 		terminalInputDelegate!.receiveKeyboardInput(data: data)
 
-		if isCtrlDown {
-			state.toggledKeys.remove(.control)
-		}
+		state.toggledKeys.remove(.control)
+		state.toggledKeys.remove(.shift)
 
 //		if !moreToolbar.isHidden {
 //			setMoreRowVisible(false, animated: true)
@@ -417,11 +485,19 @@ extension TerminalKeyInput: KeyboardToolbarViewDelegate {
 			return
 		}
 
-		terminalInputDelegate.receiveKeyboardInput(data: key.keySequence(applicationCursor: terminalInputDelegate.applicationCursor))
-        
-        if key != .control && state.toggledKeys.contains(.control) {
-            state.toggledKeys.remove(.control)
-        }
+		let isControlDown = state.toggledKeys.contains(.control)
+		let isShiftDown = state.toggledKeys.contains(.shift)
+		let data = key.keySequence(applicationCursor: terminalInputDelegate.applicationCursor,
+											 shift: isShiftDown,
+											 control: isControlDown)
+		if !data.isEmpty {
+			terminalInputDelegate.receiveKeyboardInput(data: data)
+		}
+
+		if key != .control && key != .shift && key != .more && key != .fnKeys {
+			state.toggledKeys.remove(.control)
+			state.toggledKeys.remove(.shift)
+		}
         
 		switch key {
 		case .more:
@@ -438,7 +514,7 @@ extension TerminalKeyInput: KeyboardToolbarViewDelegate {
 		switch key {
 		case .up, .down, .left, .right,
 				 .home, .end, .pageUp, .pageDown,
-				 .delete:
+				 .delete, .Delete, .fnKey(_):
 			pressedToolbarKeys = [key] //only repeat the pressed key
 			beginKeyRepeat()
 

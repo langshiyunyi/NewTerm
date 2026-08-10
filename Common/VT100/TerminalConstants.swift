@@ -67,15 +67,15 @@ public struct EscapeSequences {
 
 public extension UTF8Char {
 	var controlCharacter: UTF8Char {
-		var newCharacter = self
-		// Translate capital to lowercase
-		if self >= 0x41 && self <= 0x5A { // >= 'A' <= 'Z'
-			newCharacter += 0x61 - 0x41 // 'a' - 'A'
+		switch self {
+		case 0x3F:
+			return 0x7F
+		case 0x40...0x5F:
+			return self - 0x40
+		case 0x61...0x7A:
+			return self - 0x60
+		default:
+			return self
 		}
-		// Convert to the matching control character
-		if self >= 0x61 && self <= 0x7A { // >= 'a' <= 'z'
-			newCharacter -= 0x61 - 1 // 'a' - 1
-		}
-		return newCharacter
 	}
 }
